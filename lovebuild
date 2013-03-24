@@ -1,0 +1,125 @@
+#!/usr/bin/env python
+#doesn't handle files that start with '!'
+from sys import argv
+from sys import exit
+import getopt
+import fnmatch
+import os
+import os.path
+import zipfile
+
+FILE_NAME = 'test.love' #default name for output file
+START_DIR = os.getcwd() #works in cwd by default
+
+def show_usage():
+    print "Usage: love_build [options]"
+
+def yes_no(query):
+    while True:
+        text = raw_input(query + " [y/N]").lower()
+        if text in ('y', 'yes'):
+            return True
+        elif text in ('n', 'no', ''):
+            return False
+try:
+    opts, args = getopt = getopt.getopt(argv[1:], 'o:d:', ['output', 'dir'])
+    print opts, args
+except getopt.GetoptError as err:
+    show_usage()
+    exit(2)
+for opt, arg in opts:
+    #print opt, arg
+    if opt in ('-o', '--output'):
+        FILE_NAME = arg
+    elif opt in ('-d', '--dir'):
+        if os.path.isabs(arg):
+            START_DIR = arg
+        else:
+            START_DIR = os.path.join(os.getcwd(), arg)
+
+os.chdir(START_DIR)
+print 'Building file <%s> from dir %s' % (FILE_NAME, START_DIR)
+
+#reads a .gitignore file if it can find one
+git_ignore_file = []
+git_not_ignore_file = []
+git_ignore_dir = []
+git_not_ignore_dir = []
+try:
+    print os.getcwd()
+    git_ignore_f = open('.gitignore')
+    for line in git_ignore_f.readlines():
+        line = line.strip() #chomp off the newline
+        if line.startswith('#'): continue
+        if not line.endswith('/'):
+            if not line.startswith('!'):
+                git_ignore_file.append(line)
+            else:
+                git_not_ignore_file.append(line[1:])
+        else:
+            if not line.startswith('!'):
+                git_ignore_dir.append(line[-1])
+            else:
+                git_not_ignore_dir.append(line[1:-1])
+    git_ignore_f.close()
+except IOError:
+    print '.gitignore file could not be found, all files in tree will be included'
+    cont = yes_no("Continue?")
+    if not cont:
+               exit(0)
+git_ignore_file.append(argv[0]) #never include this file in the build
+git_ignore_dir.append('.git') #never include .git
+
+#build up a list of the paths to add to the build
+paths_to_build = []
+for root, dirs, files in os.walk(START_DIR):
+    dirs_to_delete = []
+    in_not_ignore = []
+    in_ignore = []
+    for not_ignore in git_not_ignore_dir:
+        in_not_ignore.extend(fnmatch.filter(dirs, not_ignore))
+    for ignore in git_ignore_dir:
+        in_ignore.extend(fnmatch.filter(dirs, ignore))
+    for dir in dirs:
+        if dir in in_ignore:
+            if dir not in in_not_ignore:
+                dirs_to_delete.append(dir)
+
+    files_to_delete = []
+    in_not_ignore = []
+    in_ignore = []
+    for not_ignore in git_not_ignore_file:
+        in_not_ignore.extend(fnmatch.filter(files, not_ignore))
+    for ignore in git_ignore_file:
+        in_ignore.extend(fnmatch.filter(files, ignore))
+    for file in files:
+        if file in in_ignore:
+            if file not in in_not_ignore:
+                files_to_delete.append(file)
+
+    for file in files_to_delete:
+        try: files.remove(file)
+        except ValueError: pass
+
+    for dir in dirs_to_delete:
+        try: dirs.remove(dir)
+        except ValueError: pass
+        
+    for file in files:
+        paths_to_build.append(os.path.join(root,file))
+
+#Overwrites any file using FILE_NAME's name
+try:
+    os.remove(FILE_NAME)
+    print 'Old file <%s> was removed' % (FILE_NAME,)
+except:
+    pass
+
+archive = zipfile.ZipFile(FILE_NAME, mode='w')
+for name in paths_to_build:
+    relative_name = name[len(START_DIR) + 1:] #makes files at the top of FIRST_DIR at the top of the archive
+    print 'Writing: %s\nTo: %s' % (name, relative_name)
+    archive.write(name, relative_name)
+archive.close()
+print 'Finished'
+
