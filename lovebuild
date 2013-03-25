@@ -81,6 +81,7 @@ except IOError:
     if not cont:
                exit(0)
 git_ignore_file.append(argv[0]) #never include this file in the build
+git_ignore_file.append('.gitignore') #never include the .gitignore file
 git_ignore_dir.append('.git') #never include .git
 
 #build up a list of the paths to add to the build
