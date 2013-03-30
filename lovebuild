@@ -21,6 +21,7 @@ import fnmatch
 import os
 import os.path
 import zipfile
+import sys
 
 FILE_NAME = 'test.love' #default name for output file
 START_DIR = os.getcwd() #works in cwd by default
@@ -80,7 +81,7 @@ except IOError:
     cont = yes_no("Continue?")
     if not cont:
                exit(0)
-git_ignore_file.append(argv[0]) #never include this file in the build
+git_ignore_file.append(os.path.basename(argv[0])) #never include this file in the build
 git_ignore_file.append('.gitignore') #never include the .gitignore file
 git_ignore_dir.append('.git') #never include .git
 
@@ -135,5 +136,9 @@ for name in paths_to_build:
     print 'Writing: %s\nTo: %s' % (name, relative_name)
     archive.write(name, relative_name)
 archive.close()
+if sys.platform.startswith('linux'):
+    print 'Changing file permissions'
+    print FILE_NAME
+    os.chmod(FILE_NAME, 07777)
 print 'Finished'
 
